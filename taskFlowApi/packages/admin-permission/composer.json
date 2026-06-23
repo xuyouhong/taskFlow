@@ -1,0 +1,45 @@
+{
+  "name": "admin/permission",
+  "version": "dev-stable",
+  "description": "RBAC permission management system for Laravel — with Hash ID obfuscation and built-in captcha",
+  "keywords": [
+    "rbac",
+    "permission",
+    "laravel",
+    "admin",
+    "hashid"
+  ],
+  "type": "library",
+  "license": "MIT",
+  "require": {
+    "php": "^8.2",
+    "hashids/hashids": "^5.0",
+    "laravel/sanctum": "^4.0"
+  },
+  "suggest": {
+    "intervention/image": "^3.11 - Required for image upload features"
+  },
+  "autoload": {
+    "psr-4": {
+      "Admin\\Permission\\": "src"
+    },
+    "classmap": [
+      "database/Seeders"
+    ]
+  },
+  "extra": {
+    "laravel": {
+      "providers": [
+        "Admin\\Permission\\PermissionServiceProvider"
+      ]
+    }
+  },
+  "authors": [
+    {
+      "name": "UHONG",
+      "email": "xuyouhong_@hotmail.com"
+    }
+  ],
+  "minimum-stability": "stable",
+  "prefer-stable": true
+}

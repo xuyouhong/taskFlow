@@ -1,0 +1,1 @@
+const r=t=>{if(!t)return"";if(t.startsWith("http://")||t.startsWith("https://"))return t;const s="https://rbac.api.uhong.top";return t.startsWith("/")?`${s}${t.substring(1)}`:`${s}${t}`};export{r as h};

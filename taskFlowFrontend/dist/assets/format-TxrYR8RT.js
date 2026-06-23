@@ -1,0 +1,1 @@
+import{aO as a}from"./index-CRnO2UwG.js";function o(r){return r?a(r).format("YYYY-MM-DD HH:mm:ss"):"-"}function m(r){if(r==null)return"-";if(r<60)return`${r}秒`;if(r<3600)return`${Math.floor(r/60)}分${r%60}秒`;const t=Math.floor(r/3600),f=Math.floor(r%3600/60);return`${t}小时${f}分`}export{m as a,o as f};

@@ -1,0 +1,171 @@
+// 过渡动画
+
+// ===== 页面切换 =====
+.fade-transform-enter-active,
+.fade-transform-leave-active {
+  transition: all 0.3s var(--transition-function);
+}
+
+.fade-transform-enter-from {
+  opacity: 0;
+  transform: translateX(-30px);
+}
+
+.fade-transform-leave-to {
+  opacity: 0;
+  transform: translateX(30px);
+}
+
+// ===== 淡入淡出 =====
+.fade-enter-active,
+.fade-leave-active {
+  transition: opacity 0.28s;
+}
+
+.fade-enter-from,
+.fade-leave-to {
+  opacity: 0;
+}
+
+// ===== 面包屑 =====
+.breadcrumb-enter-active,
+.breadcrumb-leave-active {
+  transition: all 0.5s;
+}
+
+.breadcrumb-enter-from,
+.breadcrumb-leave-to {
+  opacity: 0;
+  transform: translateX(20px);
+}
+
+.breadcrumb-move {
+  transition: all 0.5s;
+}
+
+// ===== 侧边栏折叠 =====
+.sidebar-transition {
+  transition: width 0.28s var(--transition-function);
+}
+
+// ===== 标签页 =====
+.tags-view-enter-active {
+  transition: all 0.3s var(--transition-function);
+}
+
+.tags-view-leave-active {
+  transition: all 0.2s var(--transition-function);
+}
+
+.tags-view-enter-from {
+  opacity: 0;
+  transform: translateX(-10px) scale(0.9);
+}
+
+.tags-view-leave-to {
+  opacity: 0;
+  transform: scale(0.9);
+}
+
+.tags-view-move {
+  transition: all 0.3s var(--transition-function);
+}
+
+// ===== 对话框 =====
+.dialog-enter-active {
+  transition: all 0.3s var(--transition-function);
+}
+
+.dialog-leave-active {
+  transition: all 0.2s var(--transition-function);
+}
+
+.dialog-enter-from {
+  opacity: 0;
+  transform: scale(0.9) translateY(-20px);
+}
+
+.dialog-leave-to {
+  opacity: 0;
+  transform: scale(0.95);
+}
+
+// ===== 下拉菜单 =====
+.dropdown-enter-active {
+  transition: all 0.2s var(--transition-function);
+}
+
+.dropdown-leave-active {
+  transition: all 0.15s var(--transition-function);
+}
+
+.dropdown-enter-from {
+  opacity: 0;
+  transform: scaleY(0.9) translateY(-5px);
+}
+
+.dropdown-leave-to {
+  opacity: 0;
+  transform: scaleY(0.95);
+}
+
+// ===== 缩放 =====
+.zoom-enter-active,
+.zoom-leave-active {
+  transition: all 0.3s var(--transition-function);
+}
+
+.zoom-enter-from,
+.zoom-leave-to {
+  opacity: 0;
+  transform: scale(0.95);
+}
+
+// ===== 滑动 =====
+.slide-right-enter-active,
+.slide-right-leave-active {
+  transition: all 0.25s var(--transition-function);
+}
+
+.slide-right-enter-from {
+  opacity: 0;
+  transform: translateX(-20px);
+}
+
+.slide-right-leave-to {
+  opacity: 0;
+  transform: translateX(20px);
+}
+
+// ===== 列表过渡 =====
+.list-enter-active,
+.list-leave-active {
+  transition: all 0.3s var(--transition-function);
+}
+
+.list-enter-from {
+  opacity: 0;
+  transform: translateY(15px);
+}
+
+.list-leave-to {
+  opacity: 0;
+  transform: translateY(-15px);
+}
+
+.list-move {
+  transition: transform 0.3s var(--transition-function);
+}
+
+// ===== 折叠面板 =====
+.collapse-enter-active,
+.collapse-leave-active {
+  transition: all 0.3s var(--transition-function);
+  overflow: hidden;
+}
+
+.collapse-enter-from,
+.collapse-leave-to {
+  max-height: 0;
+  opacity: 0;
+}
