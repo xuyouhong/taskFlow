@@ -51,7 +51,7 @@ return [
         'salt'       => env('ADMIN_PERMISSION_HASHIDS_SALT', 'admin-permission-rbac'),
 
         // Hash ID 最小长度
-        'min_length' => 8,
+        'min_length' => 16,
     ],
 
     // 验证码配置

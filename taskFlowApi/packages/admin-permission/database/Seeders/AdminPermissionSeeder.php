@@ -348,13 +348,13 @@ class AdminPermissionSeeder extends Seeder  // 修改类名
             'description' => '通知管理',
         ]);
 
-        // 为超级管理员角色分配所有菜单
-        $allMenus = AdminMenu::pluck('hash_id');
-        $superAdminRole->menus()->sync($allMenus);
-
-        // 为管理员和普通用户角色分配首页菜单
-        $adminRole->menus()->sync([$dashboardMenu->hash_id]);
-        $userRole->menus()->sync([$dashboardMenu->hash_id]);
+//        // 为超级管理员角色分配所有菜单
+//        $allMenus = AdminMenu::pluck('hash_id');
+//        $superAdminRole->menus()->sync($allMenus);
+//
+//        // 为管理员和普通用户角色分配首页菜单
+//        $adminRole->menus()->sync([$dashboardMenu->hash_id]);
+//        $userRole->menus()->sync([$dashboardMenu->hash_id]);
 
         echo "✅ 权限数据填充成功！\n";
         echo "超级管理员账号: super / gzrbbks\n";

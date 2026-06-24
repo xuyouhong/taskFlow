@@ -242,6 +242,14 @@ export interface UploadResult {
   url: string
 }
 
+export interface PaginateResult<T> {
+  data: T[]
+  total: number
+  current_page: number
+  per_page: number
+  last_page: number
+}
+
 // ============================================================
 // Login Log Statistics
 // ============================================================

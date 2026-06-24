@@ -1,1 +1,0 @@
-import{ap as e}from"./index-CRnO2UwG.js";const r=s=>e.get("/admin/users",{params:s}),o=s=>e.post("/admin/users",s),n=(s,t)=>e.put(`/admin/users/${s}`,t),u=s=>e.delete(`/admin/users/${s}`),d=s=>e.post("/admin/users/batch-status",s),c=()=>e.get("/admin/users/roles/list");export{c as a,d as b,o as c,u as d,r as g,n as u};

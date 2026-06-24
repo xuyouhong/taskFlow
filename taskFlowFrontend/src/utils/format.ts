@@ -1,18 +1,24 @@
 import dayjs from 'dayjs'
+import timezone from 'dayjs/plugin/timezone'
+import utc from 'dayjs/plugin/utc'
+
+dayjs.extend(utc)
+dayjs.extend(timezone)
+dayjs.tz.setDefault('Asia/Shanghai')
 
 export function formatDateTime(value: string | null | undefined): string {
   if (!value) return '-'
-  return dayjs(value).format('YYYY-MM-DD HH:mm:ss')
+  return dayjs(value).tz('Asia/Shanghai').format('YYYY-MM-DD HH:mm:ss')
 }
 
 export function formatDate(value: string | null | undefined): string {
   if (!value) return '-'
-  return dayjs(value).format('YYYY-MM-DD')
+  return dayjs(value).tz('Asia/Shanghai').format('YYYY-MM-DD')
 }
 
 export function formatTime(value: string | null | undefined): string {
   if (!value) return '-'
-  return dayjs(value).format('HH:mm:ss')
+  return dayjs(value).tz('Asia/Shanghai').format('HH:mm:ss')
 }
 
 export function formatFileSize(bytes: number): string {

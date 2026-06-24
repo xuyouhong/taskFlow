@@ -41,12 +41,19 @@ export function useTable<T>({
 
       const res = await fetchApi(params)
       const data = res as any
-      if (data?.list) {
+      // Support Laravel paginate format: { data: [...], total, current_page, per_page, last_page }
+      if (data?.data && Array.isArray(data.data)) {
+        tableData.value = data.data
+        pagination.total = data.total || 0
+        pagination.current_page = data.current_page || 1
+        pagination.per_page = data.per_page || 15
+        pagination.last_page = data.last_page || 1
+      } else if (data?.list) {
         tableData.value = data.list
-        pagination.total = data.total
-        pagination.current_page = data.current_page
-        pagination.per_page = data.per_page
-        pagination.last_page = data.last_page
+        pagination.total = data.total || 0
+        pagination.current_page = data.current_page || 1
+        pagination.per_page = data.per_page || 15
+        pagination.last_page = data.last_page || 1
       } else if (Array.isArray(data)) {
         tableData.value = data
         pagination.total = data.length

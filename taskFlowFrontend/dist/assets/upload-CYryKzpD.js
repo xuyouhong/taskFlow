@@ -1,1 +1,0 @@
-import{ap as o}from"./index-CRnO2UwG.js";const p=t=>{const a=new FormData;return a.append("file",t),o.post("/admin/upload",a,{headers:{"Content-Type":"multipart/form-data"}})},n=t=>{const a=new FormData;return t.forEach(e=>a.append("files[]",e)),o.post("/admin/upload/batch",a,{headers:{"Content-Type":"multipart/form-data"}})};export{n as batchUploadFiles,p as uploadFile};
