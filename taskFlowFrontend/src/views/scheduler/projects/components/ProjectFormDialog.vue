@@ -2,46 +2,49 @@
   <el-dialog
     v-model="visible"
     v-draggable
-    :title="editData ? '编辑项目' : '创建项目'"
+    :title="editData ? t('scheduler.editProject') : t('scheduler.createProject')"
     width="500px"
     @close="handleClose"
   >
     <el-form ref="formRef" :model="form" :rules="rules" label-width="100px">
-      <el-form-item label="项目名称" prop="name">
-        <el-input v-model="form.name" placeholder="请输入项目名称" />
+      <el-form-item :label="t('scheduler.projectName')" prop="name">
+        <el-input v-model="form.name" :placeholder="t('scheduler.projectNamePlaceholderInput')" />
       </el-form-item>
-      <el-form-item label="项目编码" prop="code">
-        <el-input v-model="form.code" placeholder="请输入项目编码" :disabled="!!editData" />
+      <el-form-item :label="t('scheduler.projectCode')" prop="code">
+        <el-input v-model="form.code" :placeholder="t('scheduler.projectCodePlaceholder')" :disabled="!!editData" />
       </el-form-item>
-      <el-form-item label="描述" prop="description">
-        <el-input v-model="form.description" type="textarea" rows="3" placeholder="请输入描述" />
+      <el-form-item :label="t('scheduler.projectDescription')" prop="description">
+        <el-input v-model="form.description" type="textarea" rows="3" :placeholder="t('scheduler.projectDescriptionPlaceholder')" />
       </el-form-item>
-      <el-form-item label="负责人" prop="owner_id">
-        <el-select v-model="form.owner_id" placeholder="请选择负责人" filterable style="width: 100%">
+      <el-form-item :label="t('scheduler.projectOwner')" prop="owner_id">
+        <el-select v-model="form.owner_id" :placeholder="t('scheduler.projectOwnerPlaceholder')" filterable style="width: 100%">
           <el-option v-for="user in users" :key="user.hash_id" :label="user.username" :value="user.hash_id" />
         </el-select>
       </el-form-item>
-      <el-form-item label="状态" prop="status">
+      <el-form-item :label="t('scheduler.projectStatus')" prop="status">
         <el-radio-group v-model="form.status">
-          <el-radio :label="1">启用</el-radio>
-          <el-radio :label="0">禁用</el-radio>
+          <el-radio :label="1">{{ t('scheduler.projectEnabled') }}</el-radio>
+          <el-radio :label="0">{{ t('scheduler.projectDisabled') }}</el-radio>
         </el-radio-group>
       </el-form-item>
     </el-form>
     <template #footer>
-      <el-button @click="handleClose">取消</el-button>
-      <el-button type="primary" :loading="submitting" @click="handleSubmit">确定</el-button>
+      <el-button @click="handleClose">{{ t('common.cancel') }}</el-button>
+      <el-button type="primary" :loading="submitting" @click="handleSubmit">{{ t('common.confirm') }}</el-button>
     </template>
   </el-dialog>
 </template>
 
 <script setup lang="ts">
 import { ref, watch, computed } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { ElMessage } from 'element-plus'
 import type { FormInstance, FormRules } from 'element-plus'
 import type { Project } from '@/api/project'
 import { createProject, updateProject } from '@/api/project'
 import { useAuthStore } from '@/stores/auth'
+
+const { t } = useI18n()
 
 const props = defineProps<{
   visible: boolean
@@ -66,9 +69,9 @@ const form = ref({
 })
 
 const rules: FormRules = {
-  name: [{ required: true, message: '请输入项目名称', trigger: 'blur' }],
-  code: [{ required: true, message: '请输入项目编码', trigger: 'blur' }],
-  owner_id: [{ required: true, message: '请选择负责人', trigger: 'change' }],
+  name: [{ required: true, message: () => t('scheduler.projectNameRequired'), trigger: 'blur' }],
+  code: [{ required: true, message: () => t('scheduler.projectCodeRequired'), trigger: 'blur' }],
+  owner_id: [{ required: true, message: () => t('scheduler.projectOwnerRequired'), trigger: 'change' }],
 }
 
 const visible = computed({
@@ -119,10 +122,10 @@ async function handleSubmit() {
   try {
     if (props.editData) {
       await updateProject(props.editData.hash_id, form.value)
-      ElMessage.success('更新成功')
+      ElMessage.success(t('scheduler.updateSuccess'))
     } else {
       await createProject(form.value)
-      ElMessage.success('创建成功')
+      ElMessage.success(t('scheduler.createSuccess'))
     }
     emit('submit')
     handleClose()

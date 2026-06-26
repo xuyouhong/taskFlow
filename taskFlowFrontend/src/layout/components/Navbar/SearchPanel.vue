@@ -1,163 +1,281 @@
 <template>
-  <div class="navbar-action search-panel-wrapper" ref="searchRef">
-    <el-icon :size="18" @click="showSearch = !showSearch"><Search /></el-icon>
-    <div v-show="showSearch" class="search-panel">
-      <el-input
-        ref="searchInputRef"
-        v-model="searchQuery"
-        :placeholder="t('layout.search')"
-        clearable
-        :prefix-icon="Search"
-        @keyup.esc="showSearch = false"
-        @keyup.enter="handleSearch"
-      />
-      <div class="search-results" v-if="filteredMenus.length > 0">
-        <div
-          v-for="menu in filteredMenus"
-          :key="menu.hash_id"
-          class="search-item"
-          @click="navigateTo(menu)"
+  <div class="search-container navbar-action" @click="toggleSearchPanel" :title="t('layout.search')">
+    <el-icon :size="18">
+      <Search />
+    </el-icon>
+
+    <div ref="searchPanelRef" class="search-panel" v-if="isVisible" @click.stop>
+      <div class="search-input-wrapper">
+        <el-input
+          v-model="searchKeyword"
+          :placeholder="t('layout.search')"
+          clearable
+          @input="handleSearch"
+          @keyup.enter="handleSearch"
+          @keyup.esc="closeSearchPanel"
+          ref="searchInputRef"
         >
-          <el-icon><Document /></el-icon>
-          <span class="search-item-name">{{ translateMenuName(menu.name) }}</span>
-          <span class="search-item-path">{{ menu.path }}</span>
-        </div>
+          <template #prefix>
+            <el-icon><Search /></el-icon>
+          </template>
+        </el-input>
       </div>
-      <div v-else-if="searchQuery" class="search-empty">
-        {{ t('common.noData') }}
+      <div class="search-result-wrapper" v-if="searchResult.length > 0">
+        <el-tree
+          :data="searchResult"
+          :props="treeProps"
+          :default-expand-all="true"
+          @node-click="handleTreeNodeClick"
+          highlight-current
+        >
+          <template #default="{ data }">
+            <div class="tree-node-content">
+              <el-icon v-if="data.type === 1"><Folder /></el-icon>
+              <el-icon v-else><Document /></el-icon>
+              <span>{{ data.title }}</span>
+              <span class="tree-node-path">{{ data.path }}</span>
+            </div>
+          </template>
+        </el-tree>
+      </div>
+      <div class="search-result-empty" v-else-if="searchKeyword">
+        <el-empty :description="t('common.noData')" />
       </div>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, nextTick, onMounted, onBeforeUnmount } from 'vue'
+import { ref, watch, onMounted, onUnmounted, nextTick } from 'vue'
 import { useRouter } from 'vue-router'
-import { useI18n } from 'vue-i18n'
-import { Search, Document } from '@element-plus/icons-vue'
+import { Search, Folder, Document } from '@element-plus/icons-vue'
 import { usePermissionStore } from '@/stores/permission'
-import { menuNameMap } from '@/constants/menu'
-import type { Menu } from '@/types/api'
+import { useI18n } from 'vue-i18n'
+import { translateMenuName } from '@/constants/menu'
+
+const props = defineProps<{
+  isVisible: boolean
+}>()
+
+const emit = defineEmits<{
+  'update:isVisible': [visible: boolean]
+}>()
 
 const router = useRouter()
-const { t } = useI18n()
 const permissionStore = usePermissionStore()
+const { t } = useI18n()
 
-const showSearch = ref(false)
-const searchQuery = ref('')
-const searchRef = ref<HTMLElement>()
-const searchInputRef = ref<any>()
+const searchKeyword = ref('')
+const searchResult = ref<any[]>([])
+const searchInputRef = ref<any>(null)
+const searchPanelRef = ref<HTMLElement | null>(null)
 
-function translateMenuName(name: string): string {
-  const key = menuNameMap[name]
-  return key ? t(key) : name
+const treeProps = {
+  children: 'children',
+  label: 'title',
+  isLeaf: (data: any) => data.type === 2,
 }
 
-const filteredMenus = computed(() => {
-  if (!searchQuery.value) return []
-  const query = searchQuery.value.toLowerCase()
-  const result: Menu[] = []
+const deepClone = (obj: any) => JSON.parse(JSON.stringify(obj))
 
-  function search(menus: Menu[]) {
-    for (const menu of menus) {
-      if (menu.type === 2 && menu.status === 1) {
-        const name = translateMenuName(menu.name).toLowerCase()
-        const path = (menu.path || '').toLowerCase()
-        if (name.includes(query) || path.includes(query)) {
-          result.push(menu)
-        }
+const filterMenu = (keyword: string, menus: any[]): any[] => {
+  if (!keyword.trim()) return []
+  const keywordLower = keyword.toLowerCase()
+
+  const isMatch = (menu: any) => {
+    const nameLower = menu.name?.toLowerCase() || ''
+    const pathLower = menu.path?.toLowerCase() || ''
+    const translatedName = translateMenuName(menu.name, menu.path, t).toLowerCase()
+    return (
+      nameLower.includes(keywordLower) ||
+      translatedName.includes(keywordLower) ||
+      pathLower.includes(keywordLower)
+    )
+  }
+
+  const processMenu = (menuList: any[]): boolean => {
+    let hasMatch = false
+    const children: any[] = []
+    for (const menu of menuList) {
+      if (menu.type === 3) continue
+      const menuCopy = deepClone(menu)
+      menuCopy.title = translateMenuName(menuCopy.name, menuCopy.path, t)
+
+      const menuMatch = isMatch(menuCopy)
+      let childrenMatch = false
+      if (menuCopy.children?.length > 0) {
+        childrenMatch = processMenu(menuCopy.children)
       }
-      if (menu.children) search(menu.children)
+      if (menuMatch || childrenMatch) {
+        if (childrenMatch && !menuCopy.children) menuCopy.children = []
+        children.push(menuCopy)
+        hasMatch = true
+      }
     }
+    if (hasMatch) {
+      menuList.length = 0
+      menuList.push(...children)
+    }
+    return hasMatch
   }
-  search(permissionStore.menuList)
-  return result.slice(0, 10)
-})
 
-function navigateTo(menu: Menu) {
-  router.push(menu.path)
-  showSearch.value = false
-  searchQuery.value = ''
+  const menuCopy = deepClone(menus)
+  processMenu(menuCopy)
+  return menuCopy
 }
 
-function handleSearch() {
-  if (filteredMenus.value.length > 0) {
-    navigateTo(filteredMenus.value[0])
+const handleSearch = () => {
+  if (!searchKeyword.value.trim()) {
+    searchResult.value = []
+    return
+  }
+  searchResult.value = filterMenu(searchKeyword.value, permissionStore.menuList)
+}
+
+const handleTreeNodeClick = (data: any) => {
+  if (data.type === 2 && data.path) {
+    router.push(data.path)
+    closeSearchPanel()
   }
 }
 
-function handleClickOutside(e: MouseEvent) {
-  if (searchRef.value && !searchRef.value.contains(e.target as Node)) {
-    showSearch.value = false
-  }
+const toggleSearchPanel = () => {
+  emit('update:isVisible', !props.isVisible)
 }
 
-watch(showSearch, (val) => {
-  if (val) {
-    nextTick(() => searchInputRef.value?.focus())
+const closeSearchPanel = () => {
+  emit('update:isVisible', false)
+  searchKeyword.value = ''
+  searchResult.value = []
+}
+
+watch(
+  () => props.isVisible,
+  (val) => {
+    if (val) {
+      nextTick(() => {
+        searchInputRef.value?.focus()
+      })
+    }
+  },
+)
+
+const handleClickOutside = (event: MouseEvent) => {
+  const container = document.querySelector('.search-container')
+  if (
+    container &&
+    props.isVisible &&
+    !container.contains(event.target as Node)
+  ) {
+    closeSearchPanel()
   }
-})
+}
 
 onMounted(() => {
   document.addEventListener('click', handleClickOutside)
   document.addEventListener('keydown', (e: KeyboardEvent) => {
     if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
       e.preventDefault()
-      showSearch.value = !showSearch.value
+      emit('update:isVisible', !props.isVisible)
     }
   })
 })
 
-onBeforeUnmount(() => {
+onUnmounted(() => {
   document.removeEventListener('click', handleClickOutside)
 })
 </script>
 
-<style scoped>
-.search-panel-wrapper {
+<style lang="scss" scoped>
+.search-container {
   position: relative;
+  z-index: 1001;
 }
+
 .search-panel {
   position: absolute;
-  top: 100%;
+  top: calc(100% + 8px);
   right: 0;
-  width: 320px;
-  background: var(--bg-color);
-  border: 1px solid var(--border-color);
+  width: 350px;
+  background: var(--el-bg-color-overlay);
+  border: 1px solid var(--el-border-color-lighter);
   border-radius: 8px;
-  box-shadow: var(--box-shadow);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  z-index: 9999;
   padding: 12px;
-  z-index: 2000;
-  margin-top: 4px;
-}
-.search-results {
-  max-height: 300px;
-  overflow-y: auto;
-  margin-top: 8px;
-}
-.search-item {
   display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 8px 12px;
-  cursor: pointer;
-  border-radius: 4px;
-  transition: background 0.2s;
-}
-.search-item:hover {
-  background: var(--fill-color);
-}
-.search-item-name {
-  flex: 1;
-  color: var(--text-primary-color);
-}
-.search-item-path {
-  font-size: 12px;
-  color: var(--text-secondary-color);
-}
-.search-empty {
-  text-align: center;
-  padding: 16px;
-  color: var(--text-secondary-color);
+  flex-direction: column;
+  max-height: 400px;
+
+  .search-input-wrapper {
+    margin-bottom: 12px;
+
+    :deep(.el-input__wrapper) {
+      box-shadow: none;
+      border-color: var(--el-border-color-lighter);
+
+      &:hover {
+        border-color: var(--el-color-primary);
+      }
+    }
+
+    :deep(.el-input__inner) {
+      border-radius: 4px;
+    }
+  }
+
+  .search-result-wrapper {
+    flex: 1;
+    overflow-y: auto;
+    max-height: 300px;
+
+    :deep(.el-tree) {
+      background: transparent;
+
+      :deep(.el-tree-node__content) {
+        height: auto;
+        padding: 6px 0;
+
+        &:hover {
+          background-color: var(--el-fill-color-light);
+        }
+      }
+
+      :deep(.el-tree-node__expand-icon) {
+        font-size: 14px;
+      }
+    }
+
+    .tree-node-content {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 14px;
+
+      .el-icon {
+        font-size: 16px;
+        color: var(--el-color-primary);
+      }
+
+      span:first-of-type {
+        flex: 1;
+        color: var(--el-text-color-primary);
+      }
+
+      .tree-node-path {
+        font-size: 12px;
+        color: var(--el-text-color-secondary);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        max-width: 150px;
+      }
+    }
+  }
+
+  .search-result-empty {
+    padding: 20px 0;
+    text-align: center;
+  }
 }
 </style>

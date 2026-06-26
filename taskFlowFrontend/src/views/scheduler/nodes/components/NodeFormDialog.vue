@@ -1,38 +1,41 @@
 <template>
-  <el-dialog v-model="visible" v-draggable :title="editData ? '编辑节点' : '添加节点'" width="500px" @close="handleClose">
+  <el-dialog v-model="visible" v-draggable :title="editData ? t('scheduler.editNode') : t('scheduler.createNode')" width="500px" @close="handleClose">
     <el-form ref="formRef" :model="form" :rules="rules" label-width="110px">
-      <el-form-item label="节点名称" prop="name">
-        <el-input v-model="form.name" placeholder="请输入节点名称" />
+      <el-form-item :label="t('scheduler.nodeName')" prop="name">
+        <el-input v-model="form.name" :placeholder="t('scheduler.nodeNamePlaceholderInput')" />
       </el-form-item>
-      <el-form-item label="IP地址" prop="ip">
-        <el-input v-model="form.ip" placeholder="请输入IP地址" />
+      <el-form-item :label="t('scheduler.nodeIp')" prop="ip">
+        <el-input v-model="form.ip" :placeholder="t('scheduler.nodeIpPlaceholder')" />
       </el-form-item>
-      <el-form-item label="Agent端口" prop="agent_port">
+      <el-form-item :label="t('scheduler.nodeAgentPort')" prop="agent_port">
         <el-input-number v-model="form.agent_port" :min="1" :max="65535" />
       </el-form-item>
-      <el-form-item label="主机名" prop="hostname">
-        <el-input v-model="form.hostname" placeholder="请输入主机名" />
+      <el-form-item :label="t('scheduler.nodeHostname')" prop="hostname">
+        <el-input v-model="form.hostname" :placeholder="t('scheduler.nodeHostnamePlaceholder')" />
       </el-form-item>
-      <el-form-item label="Agent Token" prop="agent_token">
-        <el-input v-model="form.agent_token" placeholder="请输入Agent Token" :disabled="!!editData" />
+      <el-form-item :label="t('scheduler.nodeAgentToken')" prop="agent_token">
+        <el-input v-model="form.agent_token" :placeholder="t('scheduler.nodeAgentTokenPlaceholder')" :disabled="!!editData" />
       </el-form-item>
-      <el-form-item label="命令白名单" prop="allowed_command_prefix">
-        <el-input v-model="form.allowed_command_prefix" placeholder="如: /opt/scripts/" />
+      <el-form-item :label="t('scheduler.nodeAllowedCommandPrefix')" prop="allowed_command_prefix">
+        <el-input v-model="form.allowed_command_prefix" :placeholder="t('scheduler.nodeAllowedCommandPrefixPlaceholder')" />
       </el-form-item>
     </el-form>
     <template #footer>
-      <el-button @click="handleClose">取消</el-button>
-      <el-button type="primary" :loading="submitting" @click="handleSubmit">确定</el-button>
+      <el-button @click="handleClose">{{ t('common.cancel') }}</el-button>
+      <el-button type="primary" :loading="submitting" @click="handleSubmit">{{ t('common.confirm') }}</el-button>
     </template>
   </el-dialog>
 </template>
 
 <script setup lang="ts">
 import { ref, watch, computed } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { ElMessage } from 'element-plus'
 import type { FormInstance, FormRules } from 'element-plus'
 import type { Node } from '@/api/node'
 import { createNode, updateNode } from '@/api/node'
+
+const { t } = useI18n()
 
 const props = defineProps<{
   visible: boolean
@@ -57,9 +60,9 @@ const form = ref({
 })
 
 const rules: FormRules = {
-  name: [{ required: true, message: '请输入节点名称', trigger: 'blur' }],
-  ip: [{ required: true, message: '请输入IP地址', trigger: 'blur' }],
-  agent_token: [{ required: true, message: '请输入Agent Token', trigger: 'blur' }],
+  name: [{ required: true, message: () => t('scheduler.nodeNameRequired'), trigger: 'blur' }],
+  ip: [{ required: true, message: () => t('scheduler.nodeIpRequired'), trigger: 'blur' }],
+  agent_token: [{ required: true, message: () => t('scheduler.nodeAgentTokenRequired'), trigger: 'blur' }],
 }
 
 const visible = computed({
@@ -99,10 +102,10 @@ async function handleSubmit() {
   try {
     if (props.editData) {
       await updateNode(props.editData.hash_id, form.value)
-      ElMessage.success('更新成功')
+      ElMessage.success(t('scheduler.updateSuccess'))
     } else {
       await createNode(form.value)
-      ElMessage.success('创建成功')
+      ElMessage.success(t('scheduler.createSuccess'))
     }
     emit('submit')
     handleClose()

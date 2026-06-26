@@ -25,13 +25,18 @@ class AdminAuthController extends AdminController
         $ip          = $this->getClientIp($request);
         $userAgent   = $request->userAgent();
         $throttleKey = 'login:' . $ip;
+        $credentials = $request->only(['username', 'password']);
+        $logData     = compact('ip', 'userAgent', 'credentials');
 
         if (RateLimiter::tooManyAttempts($throttleKey, 5)) {
             $seconds = RateLimiter::availableIn($throttleKey);
+            $user    = AdminUser::withoutGlobalScopes()
+                ->where('username', $credentials['username'])
+                ->first();
+            $this->logLogin($logData, false, "尝试次数过多，{$seconds} 秒后再试", $user?->hash_id);
             return $this->error("尝试次数过多，请 {$seconds} 秒后再试", 429);
         }
 
-        $credentials = $request->only(['username', 'password']);
         $captchaKey  = $request->input('captcha_key');
         $captchaCode = $request->input('captcha_code');
 
@@ -40,7 +45,6 @@ class AdminAuthController extends AdminController
             ->first();
 
         $isValid = $this->captchaService->validate($captchaKey, $captchaCode);
-        $logData = compact('ip', 'userAgent', 'credentials');
 
         if (!$isValid) {
             RateLimiter::hit($throttleKey);

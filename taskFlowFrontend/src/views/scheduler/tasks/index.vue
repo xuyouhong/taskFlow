@@ -3,35 +3,35 @@
     <!-- Search Form -->
     <el-card shadow="never" class="search-card">
       <el-form :model="searchForm" inline @submit.prevent="handleSearch">
-        <el-form-item label="项目">
-          <el-select v-model="searchForm.project_id" placeholder="请选择项目" clearable style="width: 150px" @clear="handleSearch">
+        <el-form-item :label="t('scheduler.project')">
+          <el-select v-model="searchForm.project_id" :placeholder="t('scheduler.projectPlaceholder')" clearable style="width: 150px" @clear="handleSearch">
             <el-option v-for="p in projects" :key="p.hash_id" :label="p.name" :value="p.hash_id" />
           </el-select>
         </el-form-item>
-        <el-form-item label="任务名称">
-          <el-input v-model="searchForm.keyword" placeholder="任务名称" clearable @clear="handleSearch" />
+        <el-form-item :label="t('scheduler.taskName')">
+          <el-input v-model="searchForm.keyword" :placeholder="t('scheduler.taskNamePlaceholder')" clearable @clear="handleSearch" />
         </el-form-item>
-        <el-form-item label="执行器">
-          <el-select v-model="searchForm.executor_type" placeholder="请选择" clearable style="width: 120px" @clear="handleSearch">
+        <el-form-item :label="t('scheduler.executor')">
+          <el-select v-model="searchForm.executor_type" :placeholder="t('common.all')" clearable style="width: 120px" @clear="handleSearch">
             <el-option label="HTTP" value="http" />
             <el-option label="Shell" value="shell" />
             <el-option label="Job" value="job" />
             <el-option label="MQ" value="mq" />
           </el-select>
         </el-form-item>
-        <el-form-item label="状态">
-          <el-select v-model="searchForm.status" placeholder="请选择" clearable style="width: 120px" @clear="handleSearch">
-            <el-option label="启用" value="enabled" />
-            <el-option label="禁用" value="disabled" />
-            <el-option label="暂停" value="paused" />
+        <el-form-item :label="t('scheduler.status')">
+          <el-select v-model="searchForm.status" :placeholder="t('common.all')" clearable style="width: 120px" @clear="handleSearch">
+            <el-option :label="t('scheduler.statusEnabled')" value="enabled" />
+            <el-option :label="t('scheduler.statusDisabled')" value="disabled" />
+            <el-option :label="t('scheduler.statusPaused')" value="paused" />
           </el-select>
         </el-form-item>
         <el-form-item>
           <el-button type="primary" @click="handleSearch">
-            <el-icon><Search /></el-icon>搜索
+            <el-icon><Search /></el-icon>{{ t('common.search') }}
           </el-button>
           <el-button @click="handleReset">
-            <el-icon><Refresh /></el-icon>重置
+            <el-icon><Refresh /></el-icon>{{ t('common.reset') }}
           </el-button>
         </el-form-item>
       </el-form>
@@ -42,7 +42,7 @@
       <div class="table-toolbar">
         <div class="toolbar-left">
           <el-button v-permission="['tasks.store']" type="primary" @click="handleCreate">
-            <el-icon><Plus /></el-icon>创建
+            <el-icon><Plus /></el-icon>{{ t('common.create') }}
           </el-button>
         </div>
         <div class="toolbar-right">
@@ -51,39 +51,39 @@
       </div>
 
       <el-table v-loading="loading" :data="tableData" row-key="hash_id" border stripe>
-        <el-table-column prop="name" label="任务名称" min-width="150" show-overflow-tooltip />
-        <el-table-column prop="project.name" label="所属项目" min-width="120" />
-        <el-table-column prop="cron_expression" label="Cron表达式" min-width="120" />
-        <el-table-column label="执行器" width="100" align="center">
+        <el-table-column prop="name" :label="t('scheduler.taskName')" min-width="150" show-overflow-tooltip />
+        <el-table-column prop="project.name" :label="t('scheduler.belongsToProject')" min-width="120" />
+        <el-table-column prop="cron_expression" :label="t('scheduler.cronExpression')" min-width="120" />
+        <el-table-column :label="t('scheduler.executor')" width="100" align="center">
           <template #default="{ row }">
             <el-tag size="small">{{ row.executor_type.toUpperCase() }}</el-tag>
           </template>
         </el-table-column>
-        <el-table-column label="状态" width="100" align="center">
+        <el-table-column :label="t('scheduler.status')" width="100" align="center">
           <template #default="{ row }">
             <el-tag :type="getStatusType(row.status)" size="small">{{ getStatusLabel(row.status) }}</el-tag>
           </template>
         </el-table-column>
-        <el-table-column label="上次执行" min-width="170">
+        <el-table-column :label="t('scheduler.lastRun')" min-width="170">
           <template #default="{ row }">
             <span v-if="row.last_run_at_local">{{ row.last_run_at_local }}</span>
-            <span v-else class="text-muted">从未执行</span>
+            <span v-else class="text-muted">{{ t('scheduler.neverRun') }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="下次执行" min-width="170">
+        <el-table-column :label="t('scheduler.nextRun')" min-width="170">
           <template #default="{ row }">
             <span v-if="row.next_run_at_local">{{ row.next_run_at_local }}</span>
             <span v-else class="text-muted">-</span>
           </template>
         </el-table-column>
-        <el-table-column label="操作" width="280" align="center" fixed="right">
+        <el-table-column :label="t('common.actions')" width="280" align="center" fixed="right">
           <template #default="{ row }">
-            <el-button type="primary" link size="small" @click="handleEdit(row)">编辑</el-button>
-            <el-button type="success" link size="small" @click="handleTrigger(row)">执行</el-button>
-            <el-button v-if="row.status === 'enabled'" type="warning" link size="small" @click="handlePause(row)">暂停</el-button>
-            <el-button v-else-if="row.status === 'paused'" type="success" link size="small" @click="handleResume(row)">恢复</el-button>
-            <el-button type="info" link size="small" @click="handleLogs(row)">日志</el-button>
-            <el-button v-permission="['tasks.destroy']" type="danger" link size="small" @click="handleDelete(row)">删除</el-button>
+            <el-button type="primary" link size="small" @click="handleEdit(row)">{{ t('common.edit') }}</el-button>
+            <el-button type="success" link size="small" @click="handleTrigger(row)">{{ t('scheduler.trigger') }}</el-button>
+            <el-button v-if="row.status === 'enabled'" type="warning" link size="small" @click="handlePause(row)">{{ t('scheduler.pause') }}</el-button>
+            <el-button v-else-if="row.status === 'paused'" type="success" link size="small" @click="handleResume(row)">{{ t('scheduler.resume') }}</el-button>
+            <el-button type="info" link size="small" @click="handleLogs(row)">{{ t('scheduler.logs') }}</el-button>
+            <el-button v-permission="['tasks.destroy']" type="danger" link size="small" @click="handleDelete(row)">{{ t('common.delete') }}</el-button>
           </template>
         </el-table-column>
       </el-table>
@@ -148,7 +148,11 @@ function getStatusType(status: string) {
 }
 
 function getStatusLabel(status: string) {
-  const map: Record<string, string> = { enabled: '启用', disabled: '禁用', paused: '暂停' }
+  const map: Record<string, string> = {
+    enabled: t('scheduler.statusEnabled'),
+    disabled: t('scheduler.statusDisabled'),
+    paused: t('scheduler.statusPaused'),
+  }
   return map[status] || status
 }
 
@@ -164,9 +168,9 @@ function handleEdit(row: Task) {
 
 async function handleTrigger(row: Task) {
   try {
-    await ElMessageBox.confirm('确定要立即执行该任务吗？', '提示', { type: 'warning' })
+    await ElMessageBox.confirm(t('scheduler.triggerConfirm'), t('common.tip'), { type: 'warning' })
     await triggerTask(row.hash_id)
-    ElMessage.success('触发成功')
+    ElMessage.success(t('scheduler.triggerSuccess'))
     loadData()
   } catch {}
 }
@@ -174,7 +178,7 @@ async function handleTrigger(row: Task) {
 async function handlePause(row: Task) {
   try {
     await pauseTask(row.hash_id)
-    ElMessage.success('已暂停')
+    ElMessage.success(t('scheduler.pauseSuccess'))
     loadData()
   } catch {}
 }
@@ -182,7 +186,7 @@ async function handlePause(row: Task) {
 async function handleResume(row: Task) {
   try {
     await resumeTask(row.hash_id)
-    ElMessage.success('已恢复')
+    ElMessage.success(t('scheduler.resumeSuccess'))
     loadData()
   } catch {}
 }
@@ -194,9 +198,9 @@ function handleLogs(row: Task) {
 
 async function handleDelete(row: Task) {
   try {
-    await ElMessageBox.confirm('确定要删除该任务吗？', '提示', { type: 'warning' })
+    await ElMessageBox.confirm(t('scheduler.deleteConfirm'), t('common.tip'), { type: 'warning' })
     await deleteTask(row.hash_id)
-    ElMessage.success('删除成功')
+    ElMessage.success(t('scheduler.deleteSuccess'))
     loadData()
   } catch {}
 }

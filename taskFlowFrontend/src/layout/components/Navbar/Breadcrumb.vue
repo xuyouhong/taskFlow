@@ -16,7 +16,7 @@
 import { computed } from 'vue'
 import { useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
-import { menuNameMap } from '@/constants/menu'
+import { menuNameMap, translateMenuName } from '@/constants/menu'
 
 const route = useRoute()
 const { t } = useI18n()
@@ -33,21 +33,8 @@ const breadcrumbs = computed<BreadcrumbItem[]>(() => {
   for (const item of matched) {
     if (item.meta?.title) {
       const rawTitle = item.meta.title as string
-      let title: string
-
-      if (menuNameMap[rawTitle]) {
-        // Known mapping — translate via mapped key
-        title = t(menuNameMap[rawTitle])
-      } else if (rawTitle.includes('.')) {
-        // Might be an i18n key (e.g., 'user.userList') — try translating directly
-        const translated = t(rawTitle)
-        title = translated !== rawTitle ? translated : rawTitle
-      } else {
-        title = rawTitle
-      }
-
       result.push({
-        title,
+        title: translateMenuName(rawTitle, item.path, t),
         path: item.path || '/',
       })
     }

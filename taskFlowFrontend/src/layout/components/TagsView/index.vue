@@ -8,7 +8,7 @@
       @click="navigateTo(tag)"
       @contextmenu.prevent="openContextMenu($event, tag)"
     >
-      <span>{{ translateTitle(tag.title) }}</span>
+      <span>{{ translateTitle(tag) }}</span>
       <el-icon
         v-if="!tag.affix"
         class="close-icon"
@@ -41,7 +41,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { Close } from '@element-plus/icons-vue'
 import { useTagsViewStore, type TagView } from '@/stores/tagsView'
-import { menuNameMap } from '@/constants/menu'
+import { menuNameMap, translateMenuName } from '@/constants/menu'
 
 const route = useRoute()
 const router = useRouter()
@@ -55,17 +55,8 @@ const contextMenu = reactive({
   tag: null as TagView | null,
 })
 
-function translateTitle(title: string): string {
-  // Check explicit mapping first (Chinese names, static route i18n keys)
-  if (menuNameMap[title]) {
-    return t(menuNameMap[title])
-  }
-  // Try as i18n key if it contains a dot (e.g. 'user.title', 'dashboard.title')
-  if (title.includes('.')) {
-    const translated = t(title)
-    if (translated !== title) return translated
-  }
-  return title
+function translateTitle(tag: TagView): string {
+  return translateMenuName(tag.title, tag.path, t)
 }
 
 function isActive(tag: TagView): boolean {

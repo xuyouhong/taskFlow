@@ -3,27 +3,27 @@
     <!-- Search Form -->
     <el-card shadow="never" class="search-card">
       <el-form :model="searchForm" inline @submit.prevent="handleSearch">
-        <el-form-item label="渠道类型">
-          <el-select v-model="searchForm.type" placeholder="请选择" clearable style="width: 120px" @clear="handleSearch">
-            <el-option label="Email" value="email" />
-            <el-option label="Webhook" value="webhook" />
-            <el-option label="钉钉" value="dingtalk" />
-            <el-option label="企业微信" value="wecom" />
-            <el-option label="飞书" value="feishu" />
+        <el-form-item :label="t('scheduler.channelType')">
+          <el-select v-model="searchForm.type" :placeholder="t('common.all')" clearable style="width: 120px" @clear="handleSearch">
+            <el-option :label="t('scheduler.typeEmail')" value="email" />
+            <el-option :label="t('scheduler.typeWebhook')" value="webhook" />
+            <el-option :label="t('scheduler.typeDingtalk')" value="dingtalk" />
+            <el-option :label="t('scheduler.typeWecom')" value="wecom" />
+            <el-option :label="t('scheduler.typeFeishu')" value="feishu" />
           </el-select>
         </el-form-item>
-        <el-form-item label="状态">
-          <el-select v-model="searchForm.status" placeholder="请选择" clearable style="width: 120px" @clear="handleSearch">
-            <el-option label="启用" :value="1" />
-            <el-option label="禁用" :value="0" />
+        <el-form-item :label="t('scheduler.channelStatus')">
+          <el-select v-model="searchForm.status" :placeholder="t('common.all')" clearable style="width: 120px" @clear="handleSearch">
+            <el-option :label="t('scheduler.channelEnabled')" :value="1" />
+            <el-option :label="t('scheduler.channelDisabled')" :value="0" />
           </el-select>
         </el-form-item>
         <el-form-item>
           <el-button type="primary" @click="handleSearch">
-            <el-icon><Search /></el-icon>搜索
+            <el-icon><Search /></el-icon>{{ t('common.search') }}
           </el-button>
           <el-button @click="handleReset">
-            <el-icon><Refresh /></el-icon>重置
+            <el-icon><Refresh /></el-icon>{{ t('common.reset') }}
           </el-button>
         </el-form-item>
       </el-form>
@@ -34,7 +34,7 @@
       <div class="table-toolbar">
         <div class="toolbar-left">
           <el-button v-permission="['notification-channels.store']" type="primary" @click="handleCreate">
-            <el-icon><Plus /></el-icon>创建
+            <el-icon><Plus /></el-icon>{{ t('scheduler.createChannel') }}
           </el-button>
         </div>
         <div class="toolbar-right">
@@ -43,29 +43,29 @@
       </div>
 
       <el-table v-loading="loading" :data="tableData" row-key="hash_id" border stripe>
-        <el-table-column prop="name" label="渠道名称" min-width="150" show-overflow-tooltip />
-        <el-table-column label="类型" width="120" align="center">
+        <el-table-column prop="name" :label="t('scheduler.channelName')" min-width="150" show-overflow-tooltip />
+        <el-table-column :label="t('scheduler.channelType')" width="120" align="center">
           <template #default="{ row }">
             <el-tag size="small">{{ getTypeLabel(row.type) }}</el-tag>
           </template>
         </el-table-column>
-        <el-table-column prop="config" label="配置" min-width="200" show-overflow-tooltip>
+        <el-table-column prop="config" :label="t('scheduler.channelConfig')" min-width="200" show-overflow-tooltip>
           <template #default="{ row }">{{ JSON.stringify(row.config) }}</template>
         </el-table-column>
-        <el-table-column label="状态" width="100" align="center">
+        <el-table-column :label="t('scheduler.channelStatus')" width="100" align="center">
           <template #default="{ row }">
             <el-tag :type="row.status === 1 ? 'success' : 'danger'" size="small">
-              {{ row.status === 1 ? '启用' : '禁用' }}
+              {{ row.status === 1 ? t('scheduler.channelEnabled') : t('scheduler.channelDisabled') }}
             </el-tag>
           </template>
         </el-table-column>
-        <el-table-column label="创建时间" min-width="170">
+        <el-table-column :label="t('scheduler.channelCreatedAt')" min-width="170">
           <template #default="{ row }">{{ formatDateTime(row.created_at) }}</template>
         </el-table-column>
-        <el-table-column label="操作" width="160" align="center" fixed="right">
+        <el-table-column :label="t('common.actions')" width="160" align="center" fixed="right">
           <template #default="{ row }">
-            <el-button type="primary" link size="small" @click="handleEdit(row)">编辑</el-button>
-            <el-button v-permission="['notification-channels.destroy']" type="danger" link size="small" @click="handleDelete(row)">删除</el-button>
+            <el-button type="primary" link size="small" @click="handleEdit(row)">{{ t('common.edit') }}</el-button>
+            <el-button v-permission="['notification-channels.destroy']" type="danger" link size="small" @click="handleDelete(row)">{{ t('common.delete') }}</el-button>
           </template>
         </el-table-column>
       </el-table>
@@ -113,7 +113,13 @@ const dialogVisible = ref(false)
 const currentRow = ref<NotificationChannel | null>(null)
 
 function getTypeLabel(type: string) {
-  const map: Record<string, string> = { email: 'Email', webhook: 'Webhook', dingtalk: '钉钉', wecom: '企业微信', feishu: '飞书' }
+  const map: Record<string, string> = {
+    email: t('scheduler.typeEmail'),
+    webhook: t('scheduler.typeWebhook'),
+    dingtalk: t('scheduler.typeDingtalk'),
+    wecom: t('scheduler.typeWecom'),
+    feishu: t('scheduler.typeFeishu'),
+  }
   return map[type] || type
 }
 
@@ -129,9 +135,9 @@ function handleEdit(row: NotificationChannel) {
 
 async function handleDelete(row: NotificationChannel) {
   try {
-    await ElMessageBox.confirm('确定要删除该通知渠道吗？', '提示', { type: 'warning' })
+    await ElMessageBox.confirm(t('scheduler.channelDeleteConfirm'), t('common.tip'), { type: 'warning' })
     await deleteNotificationChannel(row.hash_id)
-    ElMessage.success('删除成功')
+    ElMessage.success(t('scheduler.deleteSuccess'))
     loadData()
   } catch {}
 }

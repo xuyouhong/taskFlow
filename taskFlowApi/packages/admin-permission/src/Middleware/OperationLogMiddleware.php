@@ -19,7 +19,7 @@ class OperationLogMiddleware
         $endTime  = microtime(true);
         $duration = round(($endTime - $startTime) * 1000);
 
-        $user = $request->user(); // 使用 $request->user()
+        $user = $request->user();
 
         if ($user && $this->shouldLogOperation($request)) {
             try {

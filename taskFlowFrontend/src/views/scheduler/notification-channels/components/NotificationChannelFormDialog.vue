@@ -1,41 +1,44 @@
 <template>
-  <el-dialog v-model="visible" v-draggable :title="editData ? '编辑渠道' : '创建渠道'" width="500px" @close="handleClose">
+  <el-dialog v-model="visible" v-draggable :title="editData ? t('scheduler.editChannel') : t('scheduler.createChannel')" width="500px" @close="handleClose">
     <el-form ref="formRef" :model="form" :rules="rules" label-width="100px">
-      <el-form-item label="渠道名称" prop="name">
-        <el-input v-model="form.name" placeholder="请输入渠道名称" />
+      <el-form-item :label="t('scheduler.channelName')" prop="name">
+        <el-input v-model="form.name" :placeholder="t('scheduler.channelNamePlaceholder')" />
       </el-form-item>
-      <el-form-item label="类型" prop="type">
-        <el-select v-model="form.type" placeholder="请选择类型" style="width: 100%">
-          <el-option label="Email" value="email" />
-          <el-option label="Webhook" value="webhook" />
-          <el-option label="钉钉" value="dingtalk" />
-          <el-option label="企业微信" value="wecom" />
-          <el-option label="飞书" value="feishu" />
+      <el-form-item :label="t('scheduler.channelType')" prop="type">
+        <el-select v-model="form.type" :placeholder="t('scheduler.channelTypePlaceholder')" style="width: 100%">
+          <el-option :label="t('scheduler.typeEmail')" value="email" />
+          <el-option :label="t('scheduler.typeWebhook')" value="webhook" />
+          <el-option :label="t('scheduler.typeDingtalk')" value="dingtalk" />
+          <el-option :label="t('scheduler.typeWecom')" value="wecom" />
+          <el-option :label="t('scheduler.typeFeishu')" value="feishu" />
         </el-select>
       </el-form-item>
-      <el-form-item label="配置" prop="config">
-        <el-input v-model="configJson" type="textarea" rows="4" placeholder='如: {"to": ["admin@example.com"]}' @blur="handleConfigBlur" />
+      <el-form-item :label="t('scheduler.channelConfig')" prop="config">
+        <el-input v-model="configJson" type="textarea" rows="4" :placeholder="t('scheduler.channelConfigPlaceholder')" @blur="handleConfigBlur" />
       </el-form-item>
-      <el-form-item label="状态" prop="status">
+      <el-form-item :label="t('scheduler.channelStatus')" prop="status">
         <el-radio-group v-model="form.status">
-          <el-radio :label="1">启用</el-radio>
-          <el-radio :label="0">禁用</el-radio>
+          <el-radio :label="1">{{ t('scheduler.channelEnabled') }}</el-radio>
+          <el-radio :label="0">{{ t('scheduler.channelDisabled') }}</el-radio>
         </el-radio-group>
       </el-form-item>
     </el-form>
     <template #footer>
-      <el-button @click="handleClose">取消</el-button>
-      <el-button type="primary" :loading="submitting" @click="handleSubmit">确定</el-button>
+      <el-button @click="handleClose">{{ t('common.cancel') }}</el-button>
+      <el-button type="primary" :loading="submitting" @click="handleSubmit">{{ t('common.confirm') }}</el-button>
     </template>
   </el-dialog>
 </template>
 
 <script setup lang="ts">
 import { ref, watch, computed } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { ElMessage } from 'element-plus'
 import type { FormInstance, FormRules } from 'element-plus'
 import type { NotificationChannel } from '@/api/notificationChannel'
 import { createNotificationChannel, updateNotificationChannel } from '@/api/notificationChannel'
+
+const { t } = useI18n()
 
 const props = defineProps<{
   visible: boolean
@@ -59,8 +62,8 @@ const form = ref({
 })
 
 const rules: FormRules = {
-  name: [{ required: true, message: '请输入渠道名称', trigger: 'blur' }],
-  type: [{ required: true, message: '请选择类型', trigger: 'change' }],
+  name: [{ required: true, message: () => t('scheduler.channelNameRequired'), trigger: 'blur' }],
+  type: [{ required: true, message: () => t('scheduler.channelTypeRequired'), trigger: 'change' }],
 }
 
 const visible = computed({
@@ -89,7 +92,7 @@ function handleConfigBlur() {
   try {
     form.value.config = JSON.parse(configJson.value)
   } catch {
-    ElMessage.error('JSON格式错误')
+    ElMessage.error(t('scheduler.jsonFormatError'))
   }
 }
 
@@ -105,10 +108,10 @@ async function handleSubmit() {
     handleConfigBlur()
     if (props.editData) {
       await updateNotificationChannel(props.editData.hash_id, form.value)
-      ElMessage.success('更新成功')
+      ElMessage.success(t('scheduler.updateSuccess'))
     } else {
       await createNotificationChannel(form.value)
-      ElMessage.success('创建成功')
+      ElMessage.success(t('scheduler.createSuccess'))
     }
     emit('submit')
     handleClose()

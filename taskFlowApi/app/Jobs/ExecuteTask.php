@@ -166,26 +166,122 @@ class ExecuteTask implements ShouldQueue
         $this->updateTaskStatus($task, $isSuccess ? 'success' : 'failed');
     }
 
+    /**
+     * 执行 Job 类型任务
+     *
+     * 通过 dispatch_sync 同步执行 Job，立即获取真实执行结果。
+     * 记录 stdout/stderr 输出、错误信息、耗时，根据执行结果判断成功/失败。
+     *
+     * executor_config 格式：
+     * {
+     *     "job_class": "App\\Jobs\\ProcessCommentStatistics",  // Job 完整类名
+     *     "params": [...]                                       // 传递给 Job 构造函数的参数
+     * }
+     *
+     * @param Task $task 任务实例
+     * @param TaskLog $taskLog 任务日志实例
+     * @throws \RuntimeException 当 Job 类不存在时抛出
+     */
     private function executeJob(Task $task, TaskLog $taskLog): void
     {
         $config = $task->executor_config ?? [];
         $jobClass = $config['job_class'] ?? '';
         $params = $config['params'] ?? [];
 
-        if (empty($jobClass) || !class_exists($jobClass)) {
+        // 校验 Job 类名
+        if (empty($jobClass)) {
+            throw new \RuntimeException('Job执行器缺少job_class配置');
+        }
+
+        if (!class_exists($jobClass)) {
             throw new \RuntimeException("Job类不存在: {$jobClass}");
         }
 
-        dispatch(new $jobClass(...$params));
+        // 校验 Job 类是否实现了 ShouldQueue 接口
+        if (!is_subclass_of($jobClass, \Illuminate\Contracts\Queue\ShouldQueue::class)) {
+            throw new \RuntimeException("Job类必须实现 ShouldQueue 接口: {$jobClass}");
+        }
 
-        $taskLog->update([
-            'status' => 'success',
-            'end_time' => now(),
-            'duration_ms' => (int) $taskLog->start_time->diffInMilliseconds(now()),
-            'response_summary' => "Job已派发: {$jobClass}",
-        ]);
+        // 使用输出缓冲捕获 Job 内部 print/echo 的内容
+        ob_start();
+        $stdout = '';
+        $stderr = '';
+        $errorMessage = null;
+        $isSuccess = false;
 
-        $this->updateTaskStatus($task, 'success');
+        try {
+            // 通过反射获取 Job 构造函数参数信息
+            $reflection = new \ReflectionClass($jobClass);
+            $constructor = $reflection->getConstructor();
+            $paramCount = $constructor ? $constructor->getNumberOfParameters() : 0;
+            $requiredParamCount = $constructor ? $constructor->getNumberOfRequiredParameters() : 0;
+
+            // 智能处理参数：当 params 为空但 Job 需要参数时，根据构造函数签名自动补全
+            // 目的：让 "params": [] 的配置也能正常调用单参数的 Job（如 __construct(array $params)）
+            if (empty($params) && $paramCount > 0) {
+                if ($paramCount === 1) {
+                    // 只有一个参数：传入空数组
+                    // 适用于 __construct(array $params) 或 __construct($data) 等
+                    $params = [[]];
+                } elseif ($requiredParamCount === 0) {
+                    // 所有参数都有默认值，可以不传
+                    $params = [];
+                } else {
+                    throw new \RuntimeException("Job需要 {$requiredParamCount} 个必填参数，但执行配置中 params 为空，请填写 params 字段");
+                }
+            }
+
+            // 同步派发 Job，dispatch_sync 会直接调用 handle() 方法并等待返回
+            // 队列连接会被临时禁用，确保 Job 同步执行
+            $result = dispatch_sync(new $jobClass(...$params));
+            $stdout = ob_get_clean();
+            $isSuccess = true;
+
+            // 记录执行结果摘要
+            $summary = $stdout !== '' ? mb_substr($stdout, 0, 500) : "Job执行成功: {$jobClass}";
+
+            $taskLog->update([
+                'status' => 'success',
+                'end_time' => now(),
+                'duration_ms' => (int) $taskLog->start_time->diffInMilliseconds(now()),
+                'response_summary' => $summary,
+            ]);
+
+            TaskLogDetail::create([
+                'task_log_id' => $taskLog->hash_id,
+                'stdout_content' => $stdout,
+                'stderr_content' => null,
+            ]);
+        } catch (\Throwable $e) {
+            // 捕获并清理输出缓冲
+            $stdout = ob_get_clean();
+            $errorMessage = $e->getMessage();
+            $stderr = $errorMessage . "\n" . $e->getTraceAsString();
+
+            $taskLog->update([
+                'status' => 'failed',
+                'end_time' => now(),
+                'duration_ms' => (int) $taskLog->start_time->diffInMilliseconds(now()),
+                'response_summary' => mb_substr($stdout, 0, 500) ?: "Job执行失败: {$jobClass}",
+                'error_message' => $errorMessage,
+            ]);
+
+            TaskLogDetail::create([
+                'task_log_id' => $taskLog->hash_id,
+                'stdout_content' => $stdout,
+                'stderr_content' => $stderr,
+            ]);
+
+            // 抛出异常，让外层 handle() 标记任务失败
+            throw $e;
+        } finally {
+            // 确保输出缓冲被清理
+            if (ob_get_level() > 0) {
+                ob_end_clean();
+            }
+        }
+
+        $this->updateTaskStatus($task, $isSuccess ? 'success' : 'failed');
     }
 
     private function executeMq(Task $task, TaskLog $taskLog): void

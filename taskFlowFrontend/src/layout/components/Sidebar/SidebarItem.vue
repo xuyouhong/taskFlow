@@ -34,7 +34,7 @@ import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import type { Menu } from '@/types/api'
 import * as ElementPlusIcons from '@element-plus/icons-vue'
-import { menuNameMap, iconMap } from '@/constants/menu'
+import { menuNameMap, iconMap, translateMenuName as translateMenu } from '@/constants/menu'
 
 const props = defineProps<{
   item: Menu
@@ -82,9 +82,7 @@ const displayTitle = computed(() => {
 })
 
 function translateMenuName(name: string): string {
-  const key = menuNameMap[name]
-  if (key) return t(key)
-  return name
+  return translateMenu(name, displayItem.value.path, t)
 }
 
 function getIcon(iconName: string): any {

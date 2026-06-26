@@ -3,21 +3,21 @@
     <!-- Search Form -->
     <el-card shadow="never" class="search-card">
       <el-form :model="searchForm" inline @submit.prevent="handleSearch">
-        <el-form-item label="项目名称">
-          <el-input v-model="searchForm.keyword" placeholder="项目名称/编码" clearable @clear="handleSearch" />
+        <el-form-item :label="t('scheduler.projectName')">
+          <el-input v-model="searchForm.keyword" :placeholder="t('scheduler.projectNamePlaceholder')" clearable @clear="handleSearch" />
         </el-form-item>
-        <el-form-item label="状态">
-          <el-select v-model="searchForm.status" placeholder="请选择" clearable style="width: 120px" @clear="handleSearch">
-            <el-option label="启用" :value="1" />
-            <el-option label="禁用" :value="0" />
+        <el-form-item :label="t('scheduler.projectStatus')">
+          <el-select v-model="searchForm.status" :placeholder="t('common.all')" clearable style="width: 120px" @clear="handleSearch">
+            <el-option :label="t('scheduler.projectEnabled')" :value="1" />
+            <el-option :label="t('scheduler.projectDisabled')" :value="0" />
           </el-select>
         </el-form-item>
         <el-form-item>
           <el-button type="primary" @click="handleSearch">
-            <el-icon><Search /></el-icon>搜索
+            <el-icon><Search /></el-icon>{{ t('common.search') }}
           </el-button>
           <el-button @click="handleReset">
-            <el-icon><Refresh /></el-icon>重置
+            <el-icon><Refresh /></el-icon>{{ t('common.reset') }}
           </el-button>
         </el-form-item>
       </el-form>
@@ -28,7 +28,7 @@
       <div class="table-toolbar">
         <div class="toolbar-left">
           <el-button v-permission="['projects.store']" type="primary" @click="handleCreate">
-            <el-icon><Plus /></el-icon>创建
+            <el-icon><Plus /></el-icon>{{ t('scheduler.createProject') }}
           </el-button>
         </div>
         <div class="toolbar-right">
@@ -37,24 +37,24 @@
       </div>
 
       <el-table v-loading="loading" :data="tableData" row-key="hash_id" border stripe>
-        <el-table-column prop="name" label="项目名称" min-width="150" show-overflow-tooltip />
-        <el-table-column prop="code" label="项目编码" min-width="120" />
-        <el-table-column prop="description" label="描述" min-width="200" show-overflow-tooltip />
-        <el-table-column prop="owner.username" label="负责人" min-width="100" />
-        <el-table-column label="状态" width="100" align="center">
+        <el-table-column prop="name" :label="t('scheduler.projectName')" min-width="150" show-overflow-tooltip />
+        <el-table-column prop="code" :label="t('scheduler.projectCode')" min-width="120" />
+        <el-table-column prop="description" :label="t('scheduler.projectDescription')" min-width="200" show-overflow-tooltip />
+        <el-table-column prop="owner.username" :label="t('scheduler.projectOwner')" min-width="100" />
+        <el-table-column :label="t('scheduler.projectStatus')" width="100" align="center">
           <template #default="{ row }">
             <el-tag :type="row.status === 1 ? 'success' : 'danger'" size="small">
-              {{ row.status === 1 ? '启用' : '禁用' }}
+              {{ row.status === 1 ? t('scheduler.projectEnabled') : t('scheduler.projectDisabled') }}
             </el-tag>
           </template>
         </el-table-column>
-        <el-table-column label="创建时间" min-width="170">
+        <el-table-column :label="t('scheduler.projectCreatedAt')" min-width="170">
           <template #default="{ row }">{{ formatDateTime(row.created_at) }}</template>
         </el-table-column>
-        <el-table-column label="操作" width="200" align="center" fixed="right">
+        <el-table-column :label="t('common.actions')" width="200" align="center" fixed="right">
           <template #default="{ row }">
-            <el-button v-permission="['projects.update']" type="primary" link size="small" @click="handleEdit(row)">编辑</el-button>
-            <el-button v-permission="['projects.destroy']" type="danger" link size="small" @click="handleDelete(row)">删除</el-button>
+            <el-button v-permission="['projects.update']" type="primary" link size="small" @click="handleEdit(row)">{{ t('common.edit') }}</el-button>
+            <el-button v-permission="['projects.destroy']" type="danger" link size="small" @click="handleDelete(row)">{{ t('common.delete') }}</el-button>
           </template>
         </el-table-column>
       </el-table>
@@ -113,9 +113,9 @@ function handleEdit(row: Project) {
 
 async function handleDelete(row: Project) {
   try {
-    await ElMessageBox.confirm('确定要删除该项目吗？', '提示', { type: 'warning' })
+    await ElMessageBox.confirm(t('scheduler.projectDeleteConfirm'), t('common.tip'), { type: 'warning' })
     await deleteProject(row.hash_id)
-    ElMessage.success('删除成功')
+    ElMessage.success(t('scheduler.deleteSuccess'))
     loadData()
   } catch {}
 }
