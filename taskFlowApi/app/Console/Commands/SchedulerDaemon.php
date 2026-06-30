@@ -97,6 +97,16 @@ class SchedulerDaemon extends Command
                 }
 
                 if ($task->concurrency_strategy === 'forbid') {
+                    $timeoutMinutes = (int) ($task->timeout_minutes ?? 120);
+                    $task->taskLogs()
+                        ->where('status', 'running')
+                        ->where('created_at', '<', now()->subMinutes($timeoutMinutes))
+                        ->update([
+                            'status' => 'failed',
+                            'error_message' => '任务超时自动重置：执行时间超过 ' . $timeoutMinutes . ' 分钟',
+                            'updated_at' => now(),
+                        ]);
+
                     $runningCount = $task->taskLogs()->where('status', 'running')->count();
                     if ($runningCount > 0) {
                         Log::info("[SchedulerDaemon] 任务 {$task->name} ({$task->hash_id}) 已有运行中的实例，跳过");

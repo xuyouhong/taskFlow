@@ -24,19 +24,15 @@ class CommentModel extends Model
     protected $connection = 'mysql_comment';
 
     /**
-     * 获取新闻评论统计（按结算周期：每月5号至次月4号）
+     * 获取新闻评论统计（按结算周期）
+     * 结算周期：每月5号为分界，例如 6月5日 ~ 7月4日 为一个周期
+     * 统计维度：每个新闻ID的总评论数(total_comments)和独立用户数(unique_users)
      *
-     * 根据当前日期自动计算所属结算周期的时间范围：
-     * - 若当前日期 ≤ 4号：统计上月1号 ~ 本月4号
-     * - 若当前日期 > 4号：统计本月1号 ~ 下月4号
-     *
-     * 数据来源为按年分表 nc_news_comment_{year}，仅统计状态正常且已发布的评论。
-     * 统计结果按新闻ID分组，返回每篇文章的评论总数和去重用户数。
      *
      * @return Collection 每篇文章的评论统计集合，包含字段：
-     *                    - nc_newsId:      文章ID
-     *                    - total_comments: 评论总数
-     *                    - unique_users:   去重评论用户数
+     *                     - nc_newsId:      文章ID
+     *                     - total_comments: 评论总数
+     *                     - unique_users:   去重评论用户数
      *
      * @Author      Xu YouHong
      * @Date        2026/06/25 17:02
@@ -46,29 +42,56 @@ class CommentModel extends Model
         $now = Carbon::now();
         $day = $now->day;
 
-        // 以每月5号为分界，确定结算周期的起止时间戳
-        // 例：6月5日 ~ 7月4日 为一个结算周期
+        // ---- 1. 计算结算周期的起止时间戳 ----
         if ($day <= 4) {
-            // 当前在1-4号，结算周期为：上月1号 到 本月4号
+            // 当前在1-4号：周期为「上月1日 00:00:00」至「本月4日 00:00:00」
             $startTime = $now->copy()->startOfMonth()->subMonth()->startOfDay()->timestamp;
             $endTime   = $now->copy()->day(4)->startOfDay()->timestamp;
         } else {
-            // 当前在5号及以后，结算周期为：本月1号 到 下月4号
+            // 当前在5号及以后：周期为「本月1日 00:00:00」至「下月4日 00:00:00」
             $startTime = $now->copy()->startOfMonth()->startOfDay()->timestamp;
             $endTime   = $now->copy()->startOfMonth()->addMonth()->day(4)->startOfDay()->timestamp;
         }
 
-        // 按年份动态拼接分表名
-        // 评论表按年分表，例如 nc_news_comment_2026
-        $table = 'nc_news_comment_' . $now->year;
+        // ---- 2. 定义公共查询条件（闭包） ----
+        $buildQuery = function ($tableName) use ($startTime, $endTime) {
+            return DB::connection('mysql_comment')
+                ->table($tableName)
+                ->selectRaw('nc_newsId, COUNT(*) AS total_comments, COUNT(DISTINCT nc_memberId) AS unique_users')
+                ->whereBetween('nc_addtime', [$startTime, $endTime])
+                ->where('nc_status', 1)                     // 审核通过
+                ->where('nc_status_time', '>', 0)     // 有审核时间
+                ->groupBy('nc_newsId')
+                ->get();
+        };
 
-        return DB::connection('mysql_comment')
-            ->table($table)
-            ->selectRaw('nc_newsId, COUNT(*) AS total_comments, COUNT(DISTINCT nc_memberId) AS unique_users')
-            ->whereBetween('nc_addtime', [$startTime, $endTime])   // 按添加时间过滤
-            ->where('nc_status', 1)                                  // 评论状态正常
-            ->where('nc_status_time', '>', 0)                        // 已发布（有发布时间）
-            ->groupBy('nc_newsId')                                   // 按新闻ID分组
-            ->get();
+        // ---- 3. 执行查询 ----
+        if ($now->month == 1) {
+            // 1月份需要跨年查询（去年表 + 今年表）
+            $lastYearTable = 'nc_news_comment_' . ($now->year - 1);
+            $thisYearTable = 'nc_news_comment_' . $now->year;
+
+            $listLastYear = $buildQuery($lastYearTable);
+            $listThisYear = $buildQuery($thisYearTable);
+
+            // ---- 4. 合并两个集合，按 nc_newsId 聚合 ----
+            return $listLastYear->merge($listThisYear)
+                ->groupBy('nc_newsId')
+                ->map(function ($items, $newsId) {
+                    // 对相同新闻ID的统计值求和
+                    $sumTotal = $items->sum('total_comments');
+                    $sumUsers = $items->sum('unique_users');
+                    return (object)[
+                        'nc_newsId'      => $newsId,
+                        'total_comments' => $sumTotal,
+                        'unique_users'   => $sumUsers,
+                    ];
+                })
+                ->values(); // 重置索引，返回普通集合
+        }
+
+        // 非1月份，只查当前年份表
+        $tableName = 'nc_news_comment_' . $now->year;
+        return $buildQuery($tableName);
     }
 }

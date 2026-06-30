@@ -7,7 +7,20 @@
 | PHP | >= 8.2 |
 | Composer | >= 2.0 |
 | MySQL | >= 8.0 |
-| Redis | >= 6.0 (可选，用于队列) |
+| Redis | >= 6.0 (用于队列) |
+| Nginx | >= 1.18 |
+| Supervisor | >= 4.0 |
+
+## PHP 扩展要求
+
+```bash
+# 安装 PHP 8.3 及扩展
+apt install php8.3 php8.3-cli php8.3-fpm \
+    php8.3-mysql php8.3-redis php8.3-xml php8.3-mbstring \
+    php8.3-intl php8.3-zip php8.3-gd php8.3-fileinfo \
+    php8.3-tokenizer php8.3-bcmath php8.3-curl \
+    php8.3-opcache php8.3-ldap
+```
 
 ## 项目结构
 
@@ -40,73 +53,302 @@ taskFlowApi/
 
 ## 部署步骤
 
-### 1. 环境准备
+### 方式一：传统部署（推荐生产环境）
 
-#### 1.1 安装 PHP 依赖
+#### 1. 上传项目到服务器
 
 ```bash
-cd taskFlowApi
+# 项目目录
+/home/www/taskFlowApi
+
+# 日志目录
+/home/logs
+```
+
+#### 2. 安装依赖
+
+```bash
+cd /home/www/taskFlowApi
 composer install
 ```
 
-#### 1.2 创建环境配置文件
+#### 3. 配置环境文件
 
 ```bash
 cp .env.example .env
-```
-
-#### 1.3 生成应用密钥
-
-```bash
 php artisan key:generate
 ```
 
-### 2. 数据库配置
-
-编辑 `.env` 文件，配置数据库连接：
+编辑 `.env` 配置数据库和 Redis 连接：
 
 ```env
-# 默认数据库（主库）
+# 主数据库
 DB_CONNECTION=mysql
-DB_HOST=127.0.0.1
+DB_HOST=10.1.16.34
 DB_PORT=3306
-DB_DATABASE=taskflow
+DB_DATABASE=task_flow
 DB_USERNAME=root
 DB_PASSWORD=your_password
 
-# 评论库（读取评论数据）
-COMMENT_DB_HOST=127.0.0.1
+# 评论数据库
+COMMENT_DB_HOST=10.1.4.28
 COMMENT_DB_PORT=3306
 COMMENT_DB_DATABASE=comment
 COMMENT_DB_USERNAME=root
 COMMENT_DB_PASSWORD=your_password
 
-# 统计库（存储统计数据）
-STATICS_DB_HOST=127.0.0.1
+# 统计数据库
+STATICS_DB_HOST=10.1.4.23
 STATICS_DB_PORT=3306
 STATICS_DB_DATABASE=statics
 STATICS_DB_USERNAME=root
 STATICS_DB_PASSWORD=your_password
 
-# Redis 配置（队列驱动）
+# Redis（队列驱动）
 REDIS_CLIENT=phpredis
-REDIS_HOST=127.0.0.1
-REDIS_PASSWORD=null
+REDIS_HOST=10.1.16.34
+REDIS_PASSWORD=your_password
 REDIS_PORT=6379
-
-# 队列配置
-QUEUE_CONNECTION=database
+QUEUE_CONNECTION=redis
 ```
 
-### 3. 数据库初始化
+#### 4. 创建日志目录并设置权限
 
-#### 3.1 运行迁移
+```bash
+# 创建日志目录
+mkdir -p /home/logs
+chown www-data:www-data /home/logs
+
+# 设置项目权限
+chown -R www-data:www-data /home/www/taskFlowApi
+chmod -R 775 /home/www/taskFlowApi/storage
+chmod -R 775 /home/www/taskFlowApi/bootstrap/cache
+```
+
+#### 5. Nginx 配置
+
+创建 `/etc/nginx/conf.d/taskflow-api.conf`：
+
+```nginx
+server {
+    listen 8080;
+    server_name _;
+
+    root /home/www/taskFlowApi/public;
+    index index.php index.html;
+
+    charset utf-8;
+
+    # 日志配置
+    access_log  /home/logs/taskflow_api_access.log;
+    error_log   /home/logs/taskflow_api_error.log;
+
+    # 最大上传大小
+    client_max_body_size 50M;
+
+    # 安全头
+    add_header X-Frame-Options "SAMEORIGIN" always;
+    add_header X-Content-Type-Options "nosniff" always;
+    add_header X-XSS-Protection "1; mode=block" always;
+
+    location / {
+        try_files $uri $uri/ /index.php?$query_string;
+    }
+
+    # 静态文件缓存
+    location ~* \.(jpg|jpeg|png|gif|ico|css|js|woff2?|svg|ttf|eot)$ {
+        expires 30d;
+        access_log off;
+    }
+
+    location = /favicon.ico { access_log off; log_not_found off; }
+    location = /robots.txt  { access_log off; log_not_found off; }
+
+    # 禁止访问隐藏文件
+    location ~ /\.(?!well-known).* {
+        deny all;
+    }
+
+    # PHP 处理（注意：使用 Unix Socket）
+    location ~ \.php$ {
+        try_files $uri =404;
+        fastcgi_pass unix:/run/php/php8.3-fpm.sock;
+        fastcgi_index index.php;
+        fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
+        include fastcgi_params;
+
+        # 超时设置
+        fastcgi_connect_timeout 300;
+        fastcgi_send_timeout 300;
+        fastcgi_read_timeout 300;
+
+        # 缓冲区设置
+        fastcgi_buffer_size 128k;
+        fastcgi_buffers 4 256k;
+        fastcgi_busy_buffers_size 256k;
+    }
+}
+```
+
+测试并重载 Nginx：
+
+```bash
+nginx -t && nginx -s reload
+```
+
+#### 6. Supervisor 配置
+
+创建 `/etc/supervisor/conf.d/taskflow.conf`（单文件统一管理调度器和队列 worker）：
+
+```ini
+; ============================================================
+; taskFlowApi - Supervisor 进程管理配置
+; ============================================================
+; 包含以下进程：
+;   1. taskflow-scheduler - 任务调度器（秒级调度）
+;   2. taskflow-queue     - 队列工作进程（处理异步任务）
+; ============================================================
+
+; -----------------------------------------------------------
+; 1. 任务调度器进程
+; -----------------------------------------------------------
+; 功能：轮询检查任务表，触发到期任务
+; 调度精度：2秒（由 --sleep 参数控制）
+; 进程数：1（调度器只能有一个主进程）
+; -----------------------------------------------------------
+[program:taskflow-scheduler]
+command=php /home/www/taskFlowApi/artisan scheduler:daemon --sleep=2
+process_name=%(program_name)s
+numprocs=1
+autostart=true          ; Supervisor 启动时自动启动该进程
+autorestart=true        ; 进程意外退出时自动重启
+user=www-data           ; 运行用户（与 Nginx/PHP-FPM 保持一致）
+stdout_logfile=/home/logs/taskflow_scheduler.log
+stdout_logfile_maxbytes=50MB    ; 单个日志文件最大 50MB
+stdout_logfile_backups=5        ; 保留 5 个轮转日志文件
+redirect_stderr=true    ; 将 stderr 重定向到 stdout 日志
+
+; -----------------------------------------------------------
+; 2. 队列工作进程
+; -----------------------------------------------------------
+; 功能：消费 Redis 队列中的任务，执行 Job 类
+; 并发数：2个 worker 进程（可根据服务器配置调整）
+; 重试次数：3次（任务失败后自动重试 3 次）
+; 超时时间：120秒（单个任务最长执行时间）
+; 休眠时间：3秒（队列空时休眠 3 秒再检查）
+; -----------------------------------------------------------
+[program:taskflow-queue]
+command=php /home/www/taskFlowApi/artisan queue:work --sleep=3 --tries=3 --timeout=120
+process_name=%(program_name)s_%(process_num)02d
+numprocs=2              ; worker 进程数量，根据服务器负载调整
+autostart=true          ; Supervisor 启动时自动启动
+autorestart=true        ; 进程意外退出时自动重启
+user=www-data           ; 运行用户
+stdout_logfile=/home/logs/taskflow_queue.log
+stdout_logfile_maxbytes=50MB    ; 单个日志文件最大 50MB
+stdout_logfile_backups=5        ; 保留 5 个轮转日志文件
+redirect_stderr=true    ; 将 stderr 重定向到 stdout 日志
+
+; ============================================================
+; 运维命令参考
+; ============================================================
+; 查看状态:    supervisorctl status
+; 重启全部:    supervisorctl restart taskflow-queue:* taskflow-scheduler
+; 重启队列:    supervisorctl restart taskflow-queue:*
+; 重启调度:    supervisorctl restart taskflow-scheduler
+; 停止全部:    supervisorctl stop taskflow-queue:* taskflow-scheduler
+; 启动全部:    supervisorctl start taskflow-queue:* taskflow-scheduler
+; 重载配置:    supervisorctl reread && supervisorctl update
+; ============================================================
+```
+
+启动 Supervisor：
+
+```bash
+supervisorctl reread
+supervisorctl update
+supervisorctl status
+```
+
+#### 7. 配置定时任务
+
+```bash
+# 添加到 www-data用户的 crontab
+echo "* * * * * cd /home/www/taskFlowApi && php artisan schedule:run >> /home/logs/taskflow_scheduler.log 2>&1" | crontab -u www-data -
+```
+
+#### 8. 配置开机自启
+
+```bash
+# 启用所有服务开机自启
+systemctl enable nginx
+systemctl enable php8.3-fpm
+systemctl enable supervisor
+systemctl enable mysql
+systemctl enable redis-server
+
+# 验证开机自启状态
+systemctl is-enabled nginx php8.3-fpm supervisor mysql redis-server
+```
+
+#### 9. 验证部署
+
+```bash
+# 验证服务运行
+supervisorctl status
+
+# 验证进程
+pgrep -af "queue:work|scheduler:daemon|php-fpm"
+
+# 验证访问
+curl -I http://服务器IP:8080/
+
+# 查看 Laravel 版本
+cd /home/www/taskFlowApi && php artisan --version
+```
+
+---
+
+### 方式二：Docker 部署
+
+#### 2.1 构建镜像
+
+```bash
+docker build -t taskflow-api:latest .
+```
+
+#### 2.2 使用 docker-compose
+
+```bash
+docker compose up -d
+```
+
+---
+
+### 方式三：开发环境
+
+```bash
+# 启动 API 服务
+php artisan serve --host=0.0.0.0 --port=8000
+
+# 启动队列监听
+php artisan queue:work
+
+# 启动定时任务守护进程
+php artisan scheduler:daemon
+```
+
+---
+
+## 数据库初始化
+
+### 运行迁移
 
 ```bash
 php artisan migrate
 ```
 
-#### 3.2 运行数据填充
+### 运行数据填充
 
 ```bash
 # 填充 RBAC 权限数据
@@ -116,149 +358,78 @@ php artisan db:seed --class=AdminPermissionSeeder
 php artisan db:seed --class=SchedulerSeeder
 ```
 
-### 4. 缓存配置
+---
+
+## 常用运维命令
+
+### 查看服务状态
 
 ```bash
-# 清除配置缓存
+# Supervisor 进程状态
+supervisorctl status
+
+# 查看队列进程
+pgrep -af "queue:work"
+
+# 查看调度进程
+pgrep -af "scheduler:daemon"
+
+# 查看定时任务列表
+php artisan schedule:list
+```
+
+### 查看日志
+
+```bash
+# 实时查看队列日志
+tail -f /home/logs/taskflow_queue.log
+
+# 实时查看调度日志
+tail -f /home/logs/taskflow_scheduler.log
+
+# 查看 Laravel 错误日志
+tail -f /home/www/taskFlowApi/storage/logs/laravel.log
+
+# 查看 Nginx 访问日志
+tail -f /home/logs/taskflow_api_access.log
+
+# 查看 Nginx 错误日志
+tail -f /home/logs/taskflow_api_error.log
+```
+
+### 重启服务
+
+```bash
+# 重启队列 worker
+supervisorctl restart taskflow-queue:*
+
+# 重启调度进程
+supervisorctl restart taskflow-scheduler:*
+
+# 重启所有服务
+supervisorctl restart all
+
+# 重载 Nginx
+nginx -s reload
+
+# 重启 PHP-FPM
+systemctl restart php8.3-fpm
+```
+
+### 清除缓存
+
+```bash
 php artisan config:clear
-
-# 清除路由缓存
 php artisan route:clear
-
-# 清除视图缓存
 php artisan view:clear
+php artisan cache:clear
 
-# 重新缓存配置（生产环境）
+# 生产环境重新缓存
 php artisan config:cache
 php artisan route:cache
 ```
 
-### 5. 存储链接
-
-```bash
-php artisan storage:link
-```
-
-### 6. 启动服务
-
-#### 6.1 开发环境
-
-```bash
-# 启动 API 服务（端口 8000）
-php artisan serve --host=0.0.0.0 --port=8000
-
-# 启动队列监听（后台运行）
-php artisan queue:work
-
-# 启动定时任务守护进程（秒级调度，可选）
-php artisan scheduler:daemon
-```
-
-#### 6.2 生产环境（推荐使用 Supervisor）
-
-创建 `/etc/supervisor/conf.d/taskflow.conf`：
-
-```ini
-[program:taskflow-api]
-process_name=%(program_name)s_%(process_num)02d
-command=php /path/to/taskFlowApi/artisan serve --host=0.0.0.0 --port=8000
-autostart=true
-autorestart=true
-stopasgroup=true
-killasgroup=true
-user=www-data
-numprocs=2
-redirect_stderr=true
-stdout_logfile=/path/to/taskFlowApi/storage/logs/api.log
-stopwaitsecs=3600
-
-[program:taskflow-queue]
-process_name=%(program_name)s_%(process_num)02d
-command=php /path/to/taskFlowApi/artisan queue:work --sleep=3 --tries=3
-queue=default
-autostart=true
-autorestart=true
-stopasgroup=true
-killasgroup=true
-user=www-data
-numprocs=4
-redirect_stderr=true
-stdout_logfile=/path/to/taskFlowApi/storage/logs/queue.log
-stopwaitsecs=3600
-
-[program:taskflow-scheduler]
-process_name=%(program_name)s_%(process_num)02d
-command=php /path/to/taskFlowApi/artisan scheduler:daemon
-autostart=true
-autorestart=true
-stopasgroup=true
-killasgroup=true
-user=www-data
-numprocs=1
-redirect_stderr=true
-stdout_logfile=/path/to/taskFlowApi/storage/logs/scheduler.log
-stopwaitsecs=3600
-```
-
-启动 Supervisor：
-
-```bash
-sudo supervisorctl reread
-sudo supervisorctl update
-sudo supervisorctl start taskflow-api:*
-sudo supervisorctl start taskflow-queue:*
-sudo supervisorctl start taskflow-scheduler:*
-```
-
-### 7. 定时任务配置
-
-#### 7.1 分钟级定时任务（Crontab）
-
-添加以下行到 crontab (`crontab -e`)：
-
-```bash
-* * * * * cd /path/to/taskFlowApi && php artisan schedule:run >> /dev/null 2>&1
-```
-
-#### 7.2 秒级定时任务
-
-秒级任务使用 `scheduler:daemon` 命令，需要通过 Supervisor 管理（如上所示）。
-
-### 8. Nginx 配置示例
-
-```nginx
-server {
-    listen 80;
-    server_name api.taskflow.com;
-    root /path/to/taskFlowApi/public;
-
-    add_header X-Frame-Options "SAMEORIGIN";
-    add_header X-Content-Type-Options "nosniff";
-
-    index index.php;
-
-    charset utf-8;
-
-    location / {
-        try_files $uri $uri/ /index.php?$query_string;
-    }
-
-    location = /favicon.ico { access_log off; log_not_found off; }
-    location = /robots.txt  { access_log off; log_not_found off; }
-
-    error_page 404 /index.php;
-
-    location ~ \.php$ {
-        fastcgi_pass unix:/var/run/php/php8.2-fpm.sock;
-        fastcgi_param SCRIPTFILENAME $realpath_root$fastcgi_script_name;
-        include fastcgi_params;
-    }
-
-    location ~ /\.(?!well-known).* {
-        deny all;
-    }
-}
-```
+---
 
 ## 数据库连接说明
 
