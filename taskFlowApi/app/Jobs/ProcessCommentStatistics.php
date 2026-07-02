@@ -91,14 +91,14 @@ class ProcessCommentStatistics implements ShouldQueue
         if (empty($data)) {
             echo "[步骤1] 自动获取评论统计数据...\n";
             Log::info('ProcessCommentStatistics params 为空，自动获取评论统计数据');
-            // getNewsComment 返回 Collection，字段为 nc_newsId / total_comments
+            // getNewsComment 返回 Collection，字段为 nc_newsId / unique_users
             // 需要转换为 news_id / num 格式
             $collection = CommentModel::getNewsComment();
             $data = $collection->map(function ($item) {
                 $item = (array) $item;
                 return [
                     'news_id' => $item['nc_newsId'] ?? null,
-                    'num'     => $item['total_comments'] ?? 0,
+                    'num'     => $item['unique_users'] ?? 0,
                 ];
             })->filter(function ($item) {
                 // 过滤掉 news_id 为空的记录
